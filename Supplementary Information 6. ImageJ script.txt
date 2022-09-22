@@ -1,0 +1,451 @@
+run("Clear Results");
+dir=getDirectory("select folder containing images to get analyzed");
+folder=getFileList(dir);
+
+Treshold_value=75;
+
+total_list_final=newArray(0);
+nb_final=newArray(0);
+total_area_final=newArray(0);
+
+
+for (h=0;h<folder.length;h++)
+{
+if (startsWith(folder[h], "image"))
+{
+
+dir1=dir+File.separator+folder[h];
+list = getFileList(dir1);
+nl=list.length;
+
+File.makeDirectory(dir+File.separator+"Analysis_filter");
+
+
+index_0=lastIndexOf(list[0],".tif");
+t1=substring(list[0],2,index_0);
+index_n=lastIndexOf(list[nl-1],".tif");
+t2=substring(list[nl-1],2,index_n);
+
+fichier_final=newArray(0);
+particule_final=newArray(0);
+unfiltered_rank_final=newArray(0);
+area_final=newArray(0);
+L_ellipse_final=newArray(0);
+l_ellipse_final=newArray(0);
+L_feret_final=newArray(0);
+l_feret_final=newArray(0);
+Aspect_ratio_ellipse_final=newArray(0);
+Aspect_ratio_feret_final=newArray(0);
+calc_value_final=newArray(0);
+R_value_final=newArray(0);
+G_value_final=newArray(0);
+B_value_final=newArray(0);
+RGB_value_final=newArray(0);
+X_final=newArray(0);
+Y_final=newArray(0);
+R_Min_final=newArray(0);
+G_Min_final=newArray(0);
+B_Min_final=newArray(0);
+R_Max_final=newArray(0);
+G_Max_final=newArray(0);
+B_Max_final=newArray(0);
+
+particle_account=newArray(nl);
+total_area=newArray(nl);
+
+filter=newArray(0.975,1.525,1.04,1.25,47,84,50,89,115,280,450000,0.015);
+
+for (j=0;j<nl;j++)
+{ 
+	open (dir1+"//"+list[j]);
+	title1=File.nameWithoutExtension();
+	title2=getTitle();
+	selectWindow(title2);
+	w=getWidth();
+	if (w>9761)
+	{
+		run("Size...", "width=9761 height=10440 depth=1 constrain average interpolation=Bilinear");
+	}
+	selectWindow(title2);
+	l=getRedScale();
+	run("Set Scale...", "distance=l known=1 pixel=1 unit=mm");
+	
+	selectWindow(title2);
+	run("Duplicate...", " ");
+	run("Split Channels");
+
+	corr=CorrB(title1);
+	corrB[j]=corr;
+
+	imageCalculator("Add create 32-bit", title1+"-1.tif (red)",title1+"-1.tif (green)");
+	selectWindow("Result of "+title1+"-1.tif (red)");
+	rename(title1+"_R+G.tif");
+	imageCalculator("Subtract create 32-bit", title1+"_R+G.tif",title1+"-1.tif (blue)");
+	rename(title1+"_R+G-B.tif");
+
+	selectWindow(title1+"_R+G-B.tif");
+	run("Duplicate...", " ");
+	setOption("ScaleConversions", true);
+	run("8-bit");
+	setThreshold(0, Treshold_value);
+	run("Analyze Particles...", "size=0.0046-Infinity exclude clear add");
+
+	
+	m=roiManager("count");
+	false_measure=newArray(m);
+	unfiltered_rank=newArray(m);
+
+	for (i=0;i<m;i++)
+	{
+		selectWindow(title1+"-1.tif (red)");
+		roiManager("select", i);
+		area=getValue("Area");
+		R=getValue("Mean");
+		Rmin=getValue("Min");
+		Rmax=getValue("Max");
+		selectWindow(title1+"-1.tif (green)");
+		roiManager("select", i);
+		G=getValue("Mean");
+		Gmin=getValue("Min");
+		Gmax=getValue("Max");
+		selectWindow(title1+"-1.tif (blue)");
+		roiManager("select", i);
+		B=getValue("Mean");
+		Bmin=getValue("Min");
+		Bmax=getValue("Max");
+		selectWindow(title1+"_R+G-B.tif");
+		roiManager("select", i);
+		RG=getValue("Mean");
+		false_measure[i]=ROIscore(R,G,B,RG,Rmin,Rmax,Gmin,Gmax,Bmin,Bmax,area,filter);
+		unfiltered_rank[i]=i+1;
+	}
+	
+	
+	for (i=m-1;i>-1;i--)
+	{
+		if (false_measure[i]>0)
+		{
+			unfiltered_rank=Array.deleteIndex(unfiltered_rank,i);
+			roiManager("select", i);
+			roiManager("delete");
+		}
+	}
+
+	
+	n=roiManager("count");
+	
+	if (n>0)
+	{	
+		fichier=newArray(n);
+		particule=newArray(n);
+		area=newArray(n);
+		L_ellipse=newArray(n);
+		l_ellipse=newArray(n);
+		L_feret=newArray(n);
+		l_feret=newArray(n);
+		Aspect_ratio_ellipse=newArray(n);
+		Aspect_ratio_feret=newArray(n);
+		calc_value=newArray(n);
+		R_value=newArray(n);
+		G_value=newArray(n);
+		B_value=newArray(n);
+		RGB_value=newArray(n);
+		X=newArray(n);
+		Y=newArray(n);
+		R_Min=newArray(n);
+		G_Min=newArray(n);
+		B_Min=newArray(n);
+		R_Max=newArray(n);
+		G_Max=newArray(n);
+		B_Max=newArray(n);
+
+		selectWindow(title1+"_R+G-B.tif");
+		for (i=0;i<n;i++)
+		{
+			fichier[i]=title1;
+			particule[i]=i+1;
+			roiManager("select", i);
+			area[i]=getValue("Area");
+			L_ellipse[i]=getValue("Major");
+			l_ellipse[i]=getValue("Minor");
+			L_feret[i]=getValue("Feret");
+			l_feret[i]=getValue("MinFeret");
+			Aspect_ratio_ellipse[i]=L_ellipse[i]/l_ellipse[i];
+			Aspect_ratio_feret[i]=L_feret[i]/l_feret[i];
+			calc_value[i]=getValue("Mean");
+			X[i]=getValue("XM");
+			Y[i]=getValue("YM");
+		}
+		selectWindow(title1+"-1.tif (red)");
+		for (i=0;i<n;i++)
+		{
+			roiManager("select", i);
+			R_value[i]=getValue("Mean");
+			R_Min[i]=getValue("Min");
+			R_Max[i]=getValue("Max");
+		}
+		selectWindow(title1+"-1.tif (green)");
+		for (i=0;i<n;i++)
+		{
+			roiManager("select", i);
+			G_value[i]=getValue("Mean");
+			G_Min[i]=getValue("Min");
+			G_Max[i]=getValue("Max");
+	
+		}
+		selectWindow(title1+"-1.tif (blue)");
+		for (i=0;i<n;i++)
+		{
+			roiManager("select", i);
+			B_value[i]=getValue("Mean");
+			B_Min[i]=getValue("Min");
+			B_Max[i]=getValue("Max");
+			RGB_value[i]=R_value[i]+G_value[i]+B_value[i];
+		}
+		
+		Array.getStatistics(area,min, max, mean, std);
+		total_area[j]=mean*n;
+		particle_account[j]=n;	
+
+		print (list[j]+" : "+total_area[j]+"mm² "+particle_account[j]+" charcoals"); 
+				
+	}
+	else
+	{
+		fichier=newArray(title1);
+		particule=newArray(0,0);
+		area=newArray(0,0);
+		L_ellipse=newArray("NA");
+		l_ellipse=newArray("NA");
+		L_feret=newArray("NA");
+		l_feret=newArray("NA");
+		Aspect_ratio_ellipse=newArray("NA");
+		Aspect_ratio_feret=newArray("NA");
+		calc_value=newArray("NA");
+		R_value=newArray("NA");
+		G_value=newArray("NA");
+		B_value=newArray("NA");
+		RGB_value=newArray("NA");
+		X=newArray("NA");
+		Y=newArray("NA");
+		R_Min=newArray("NA");
+		G_Min=newArray("NA");
+		B_Min=newArray("NA");
+		R_Max=newArray("NA");
+		G_Max=newArray("NA");
+		B_Max=newArray("NA");
+		total_area[j]=0;
+		particle_account[j]=0;	 
+
+		print (list[j]+" : "+total_area[j]+"mm² "+particle_account[j]+" charcoals"); 
+	}
+
+	
+
+	Array.show("final "+title1,particule,area,L_ellipse,l_ellipse,L_feret,l_feret,Aspect_ratio_ellipse,Aspect_ratio_feret,calc_value,R_value,G_value,B_value,RGB_value,X,Y,R_Min,G_Min,B_Min,R_Max,B_Max,G_Max,unfiltered_rank);
+	Table.save(dir+File.separator+"Analysis_filter"+File.separator+title1+"_filter.csv");
+	run("Close");
+	
+	fichier_final=Array.concat(fichier_final,fichier);
+	particule_final=Array.concat(particule_final,particule);
+	area_final=Array.concat(area_final,area);
+	L_ellipse_final=Array.concat(L_ellipse_final,L_ellipse);
+	l_ellipse_final=Array.concat(l_ellipse_final,l_ellipse);
+	L_feret_final=Array.concat(L_feret_final,L_feret);
+	l_feret_final=Array.concat(l_feret_final,l_feret);
+	Aspect_ratio_ellipse_final=Array.concat(Aspect_ratio_ellipse_final,Aspect_ratio_ellipse);
+	Aspect_ratio_feret_final=Array.concat(Aspect_ratio_feret_final,Aspect_ratio_feret);
+	calc_value_final=Array.concat(calc_value_final,calc_value);
+	R_value_final=Array.concat(R_value_final,R_value);
+	G_value_final=Array.concat(G_value_final,G_value);
+	B_value_final=Array.concat(B_value_final,B_value);
+	RGB_value_final=Array.concat(RGB_value_final,RGB_value);
+	X_final=Array.concat(X_final,X);
+	Y_final=Array.concat(Y_final,Y);
+	R_Min_final=Array.concat(R_Min_final,R_Min);
+	G_Min_final=Array.concat(G_Min_final,G_Min);
+	B_Min_final=Array.concat(B_Min_final,B_Min);
+	R_Max_final=Array.concat(R_Max_final,R_Max);
+	G_Max_final=Array.concat(G_Max_final,G_Max);
+	B_Max_final=Array.concat(B_Max_final,B_Max);
+	unfiltered_rank_final=Array.concat(unfiltered_rank_final,unfiltered_rank);
+	
+	shape="yes"; //yes/no
+	if (shape=="yes")
+	{
+		selectWindow(title2);
+		run("Duplicate...", " ");
+		setFont("SanSerif", 120, "antialiased");
+		setJustification("right");
+		odd=1;
+		for (i=0;i<n;i++)
+		{
+			if (odd==1)
+			{
+				label_color="yellow";//odd number
+				odd=0;
+			}
+			else
+			{
+				label_color="cyan";//even number
+				odd=1;
+			}
+			setColor(label_color);
+			roiManager("select", i);
+			Overlay.addSelection(label_color,10);
+			Overlay.drawString(i+1,(X[i]-0.35)*l,(Y[i]+0.15)*l);
+			Overlay.show;
+		}
+		Overlay.flatten;
+		rename(title1+"shape.tif");	unfiltered_rank=newArray(m);
+		saveAs("tiff",dir+File.separator+"Analysis_filter"+File.separator+title1+"_shape");
+	}
+	close("*");
+}
+
+Array.show("total",list,total_area,particle_account);
+Table.save(dir+File.separator+"Analysis_filter"+File.separator+"total_filter"+".csv");
+Array.show("final",fichier_final,particule_final,area_final,L_ellipse_final,l_ellipse_final,L_feret_final,l_feret_final,Aspect_ratio_ellipse_final,Aspect_ratio_feret_final,calc_value_final,R_value_final,G_value_final,B_value_final,RGB_value_final,X_final,Y_final,R_Min_final,G_Min_final,B_Min_final,R_Max_final,G_Max_final,B_Max_final,unfiltered_rank_final);
+Table.save(dir+File.separator+"Analysis_filter"+File.separator+"results_folder_filter"+".csv");
+
+File.rename(dir+File.separator+"Analysis_filter",dir+File.separator+"Analysis_filter "+t1+"-"+t2);
+File.rename(dir1,dir+File.separator+"images - performed analysis - "+t1+"-"+t2);
+
+
+	}
+}
+
+function CorrB(title1)
+{
+	n=1200;
+	N=300;
+
+	selectWindow(title1+".tif");
+	makeRectangle(0, 0, N, N);
+	color=getValue("Mean");
+
+	if (color==0)
+	{
+		x1=getWidth()-n;
+		y1=N;
+		x2=n*0.7;
+		y2=n*0.7;
+		print("dark square !!!");
+	}
+	else
+	{
+		x1=N;
+		y1=N;
+		x2=n*0.7;
+		y2=n*0.7;
+	}
+	
+	selectWindow(title1+"-1.tif (red)");
+	makeRectangle(x1, y1, x2, y2);
+	R=getValue("Mean");
+	
+	
+	selectWindow(title1+"-1.tif (green)");
+	makeRectangle(x1, y1, x2, y2);
+	G=getValue("Mean");
+
+	selectWindow(title1+"-1.tif (blue)");
+	makeRectangle(x1, y1, x2, y2);
+	B=getValue("Mean");
+	
+	
+	corr1=G/1.04-B;
+	corr2=R/1.08-B;
+	corr=(corr1+corr2)/2;
+	return corr;	
+}
+
+function getRedScale()
+{
+	n=1200;
+	run("Duplicate...", " ");
+	makeRectangle(getWidth()-n, getHeight()-n, n*0.8, n*0.8);
+	run("Crop");
+	run("8-bit");
+	setThreshold(0,85);
+	run("Analyze Particles...", "clear add");
+	roiManager("select",0);
+	run("Crop");
+	n1=getWidth();
+	k=1;
+	for (i=0;i<n1;i++)
+	{
+		if (k==1)
+		{
+			if (getValue(i,0)>110)
+			{
+				x=i;
+				k=0;
+			}
+		}
+	}
+	close();
+	if (x>n1/2)
+	{
+		l=n1-(n1-x)*2;	
+	}
+	else
+	{
+		l=n1-x*2;	
+	}
+	return l;
+}
+
+function ROIscore(R,G,B,RG,Rmin,Rmax,Gmin,Gmax,Bmin,Bmax,area,filter)
+{
+	k=0;
+	if (R/B<filter[0])
+	{
+		k=k+1;
+	}
+	if (R/B>filter[1])
+	{
+		k=k+1;
+	}
+	if (R/G<filter[2])
+	{
+		k=k+1;
+	}
+	if (R/G>filter[3])
+	{
+		k=k+1;
+	}
+	if (R<filter[4])
+	{
+		k=k+1;
+	}
+	if (R>filter[5])
+	{
+		k=k+1;
+	}
+	if (RG<filter[6])
+	{
+		k=k+1;
+	}
+	if (RG>filter[7])
+	{
+		k=k+1;
+	}
+	if ((R+RG)*R/B*R/G<filter[8])
+	{
+		k=k+1;
+	}
+	if ((R+RG)*R/B*R/G>filter[9])
+	{
+		k=k+1;
+	}
+		if ((Bmin+Gmin)*(Bmax-Bmin+Gmax-Gmin)*((Rmax/3+Gmax/3+Bmax/3))<filter[10])
+	{
+		k=k+1;
+	}
+	if (area<filter[11])
+	{
+		k=k+1;
+	}
+	return k;
+}
